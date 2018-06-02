@@ -71,12 +71,11 @@ class OAuthClient(object):
         self._headers = {'Content-Type': 'application/json'}
         self._session = utils.get_requests_session(proxy_config or {})
 
-    def get(self, path, *args, **kwargs):
+    def request(self, method, path, *args, **kwargs):
         if self._authorization_failed:
             logger.debug('Blocking request as previous authorization failed.')
             return {}
 
-        # TODO: Factor this out once we add more methods.
         # TODO: Don't silently error out.
         try:
             if self._should_refresh_token():
@@ -87,11 +86,26 @@ class OAuthClient(object):
 
         # Make sure our headers always override user supplied ones.
         kwargs.setdefault('headers', {}).update(self._headers)
-        result = self._request_with_retries('GET', path, *args, **kwargs)
+        result = self._request_with_retries(method.upper(), path, *args, **kwargs)
 
-        if result is None or 'error' in result:
+        if result is None or 'error' in result or ('status' in result and
+                                                   result['status'] >= 400):
+            logger.error('Spotify web API call failed: {} {}: {}'.format(
+                method.upper(), path, result))
             return {}
         return result
+
+    def get(self, path, *args, **kwargs):
+        return self.request('GET', path, *args, **kwargs)
+
+    def post(self, path, *args, **kwargs):
+        return self.request('POST', path, *args, **kwargs)
+
+    def put(self, path, *args, **kwargs):
+        return self.request('PUT', path, *args, **kwargs)
+
+    def delete(self, path, *args, **kwargs):
+        return self.request('DELETE', path, *args, **kwargs)
 
     def _should_refresh_token(self):
         # TODO: Add jitter to margin?

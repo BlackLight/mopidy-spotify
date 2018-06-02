@@ -188,10 +188,48 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
             return translator.to_playlist(sp_playlist, username=username)
 
     def delete(self, uri):
-        pass  # TODO
+        # Playlist deletion is not implemented in the web API, see
+        # https://github.com/spotify/web-api/issues/555
+        pass
 
     def save(self, playlist):
-        pass  # TODO
+        saved_playlist = self.lookup(playlist.uri)
+        if not saved_playlist:
+            return
+
+        user_id = playlist.uri.split(':')[-3]
+        playlist_id = playlist.uri.split(':')[-1]
+        url = 'users/{}/playlists/{}/tracks'.format(user_id, playlist_id)
+
+        new_tracks = dict((track.uri, track) for track in playlist.tracks)
+        old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
+        removed_uris = [track.uri for track in saved_playlist.tracks
+                        if track.uri not in new_tracks]
+
+        if removed_uris:
+            logger.info('Removing {} tracks from playlist {}: {}'.format(
+                len(removed_uris), playlist.name, removed_uris))
+            response = self._backend._web_client.delete(
+                url, data = {'tracks': [{'uri': uri for uri in removed_uris}] })
+
+            if response:
+                return self.lookup(playlist.uri)
+        else:
+            is_success = True
+            for (i, track) in enumerate(playlist.tracks):
+                if track.uri not in old_tracks:
+                    logger.info('Adding {} to playlist {}'.format(
+                        track.uri, playlist.name))
+                    response = self._backend._web_client.post(
+                        url, data = { 'uris': track.uri, 'position': i })
+
+                    if not response:
+                        is_success = False
+
+            if is_success:
+                return self.lookup(playlist.uri)
+
+        return
 
 
 def on_container_loaded(sp_playlist_container):
