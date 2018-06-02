@@ -10,7 +10,6 @@ import spotify
 from mopidy_spotify import lookup, translator
 
 
-_API_BASE_URI = 'https://api.spotify.com/v1/search'
 _SEARCH_TYPES = ['album', 'artist', 'track']
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ def search(config, session, web_client,
         return models.SearchResult(uri='spotify:search')
 
     if 'uri' in query:
-        return _search_by_uri(config, session, query)
+        return _search_by_uri(config, session, query, web_client)
 
     sp_query = translator.sp_search_query(query)
     if not sp_query:
@@ -53,7 +52,7 @@ def search(config, session, web_client,
             'to at most 50.')
         search_count = 50
 
-    result = web_client.get(_API_BASE_URI, params={
+    result = web_client.get('search', params={
         'q': sp_query,
         'limit': search_count,
         'market': session.user_country,
@@ -78,10 +77,10 @@ def search(config, session, web_client,
         uri=uri, albums=albums, artists=artists, tracks=tracks)
 
 
-def _search_by_uri(config, session, query):
+def _search_by_uri(config, session, query, web_client):
     tracks = []
     for uri in query['uri']:
-        tracks += lookup.lookup(config, session, uri)
+        tracks += lookup.lookup(config, session, uri, web_client)
 
     uri = 'spotify:search'
     if len(query['uri']) == 1:
