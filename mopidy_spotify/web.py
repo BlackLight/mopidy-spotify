@@ -114,9 +114,16 @@ class OAuthClient(object):
     def _refresh_token(self):
         logger.debug('Fetching OAuth token from %s', self._refresh_url)
 
+        scopes = ['playlist-read-private', 'playlist-read-collaborative',
+                  'user-follow-read', 'user-library-read',
+                  'playlist-modify-public', 'playlist-modify-private',
+                  'user-library-modify', 'user-follow-modify']
+
         data = {'grant_type': 'client_credentials'}
+        refresh_url = '{}?scope={}'.format(self._refresh_url, ','.join(scopes))
         result = self._request_with_retries(
-            'POST', self._refresh_url, auth=self._auth, data=data)
+            'POST', refresh_url, auth=self._auth, data=data)
+        print('**** OAUTH RESULT: {}'.format(result))
 
         if result is None:
             raise OAuthTokenRefreshError('Unknown error.')
