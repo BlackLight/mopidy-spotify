@@ -123,7 +123,6 @@ class OAuthClient(object):
         refresh_url = '{}?scope={}'.format(self._refresh_url, ','.join(scopes))
         result = self._request_with_retries(
             'POST', refresh_url, auth=self._auth, data=data)
-        print('**** OAUTH RESULT: {}'.format(result))
 
         if result is None:
             raise OAuthTokenRefreshError('Unknown error.')
@@ -176,8 +175,8 @@ class OAuthClient(object):
                 result = self._decode(response)
 
             if status_code >= 400 and status_code < 600:
-                logger.debug('Fetching %s failed: %s',
-                             prepared_request.url, status_code)
+                logger.warning('Fetching %s failed: %s: %s',
+                             prepared_request.url, status_code, result)
 
             # Filter out cases where we should not retry.
             if status_code and status_code not in self._retry_statuses:

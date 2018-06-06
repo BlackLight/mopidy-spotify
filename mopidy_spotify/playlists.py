@@ -210,24 +210,35 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
             logger.info('Removing {} tracks from playlist {}: {}'.format(
                 len(removed_uris), playlist.name, removed_uris))
             response = self._backend._web_client.delete(
-                url, data = {'tracks': [{'uri': uri for uri in removed_uris}] })
+                url, headers = { 'Content-Type': 'application/json' },
+                json = {'tracks': [{'uri': uri for uri in removed_uris}] })
 
-            if response:
+            if response and 'error' not in response:
+                # Invalidate the cache for this playlist to force a new lookup
+                self._cache2[playlist.uri] = None
                 return self.lookup(playlist.uri)
         else:
-            is_success = True
+            position = None
+            added_uris = []
+
             for (i, track) in enumerate(playlist.tracks):
                 if track.uri not in old_tracks:
                     logger.info('Adding {} to playlist {}'.format(
                         track.uri, playlist.name))
-                    response = self._backend._web_client.post(
-                        url, data = { 'uris': track.uri, 'position': i })
 
-                    if not response:
-                        is_success = False
+                    added_uris.append(track.uri)
+                    if position is None:
+                        position = i
 
-            if is_success:
-                return self.lookup(playlist.uri)
+            if added_uris:
+                response = self._backend._web_client.post(
+                    url, headers = { 'Content-Type': 'application/json' },
+                    json = { 'uris': added_uris, 'position': position })
+
+                if response and 'error' not in response:
+                    # Invalidate the cache for this playlist to force a new lookup
+                    self._cache2[playlist.uri] = None
+                    return self.lookup(playlist.uri)
 
         return
 
