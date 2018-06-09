@@ -215,7 +215,7 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
 
             if response and 'error' not in response:
                 # Invalidate the cache for this playlist to force a new lookup
-                self._cache2[playlist.uri] = None
+                self._full_cache[playlist.uri] = None
                 return self.lookup(playlist.uri)
         else:
             position = None
@@ -237,7 +237,7 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
 
                 if response and 'error' not in response:
                     # Invalidate the cache for this playlist to force a new lookup
-                    self._cache2[playlist.uri] = None
+                    self._full_cache[playlist.uri] = None
                     return self.lookup(playlist.uri)
 
         return
