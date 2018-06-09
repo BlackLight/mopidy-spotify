@@ -119,11 +119,11 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
         with utils.time_logger('playlist.get_items(%s)' % uri):
             return self._get_playlist(uri, as_items=True)
 
-    def lookup(self, uri):
+    def lookup(self, uri, skip_cache=False):
         with utils.time_logger('playlists.lookup(%s)' % uri):
-            return self._get_playlist(uri)
+            return self._get_playlist(uri, skip_cache=skip_cache)
 
-    def _get_playlist(self, uri, as_items=False):
+    def _get_playlist(self, uri, as_items=False, skip_cache=False):
         logger.debug("Getting playlist URI %s", uri)
         def gen_fields(name, fields=[]):
             fields = ['uri', 'name'] + fields
@@ -138,7 +138,7 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
         web_playlist = self._full_cache.get(uri, None)
 
         if web_playlist is not None:
-            if web_playlist.item.tracks:
+            if web_playlist.item.tracks and not skip_cache:
                 logger.debug('Playlist %s found in cache', uri)
                 return web_playlist.item
             else:
@@ -216,8 +216,7 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
 
             if response and 'error' not in response:
                 # Invalidate the cache for this playlist to force a new lookup
-                self._full_cache[playlist.uri] = None
-                return self.lookup(playlist.uri)
+                return self.lookup(playlist.uri, skip_cache=True)
         else:
             position = None
             added_uris = []
@@ -238,8 +237,7 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
 
                 if response and 'error' not in response:
                     # Invalidate the cache for this playlist to force a new lookup
-                    self._full_cache[playlist.uri] = None
-                    return self.lookup(playlist.uri)
+                    return self.lookup(playlist.uri, skip_cache=True)
 
         return
 
