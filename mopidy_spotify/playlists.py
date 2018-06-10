@@ -217,6 +217,10 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
             if response and 'error' not in response:
                 # Invalidate the cache for this playlist to force a new lookup
                 return self.lookup(playlist.uri, skip_cache=True)
+
+            if 'error' in response:
+                logging.error('Error on playlist item(s) removal: {}'
+                              .format(response['error']))
         else:
             position = None
             added_uris = []
@@ -238,6 +242,13 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
                 if response and 'error' not in response:
                     # Invalidate the cache for this playlist to force a new lookup
                     return self.lookup(playlist.uri, skip_cache=True)
+
+                if 'error' in response:
+                    logging.error('Error on playlist add: {}'
+                                  .format(response['error']))
+            else:
+                logging.info('No new tracks added to the playlist {}'
+                             .format(playlist.name))
 
         return
 
