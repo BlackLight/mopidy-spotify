@@ -188,6 +188,29 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
             username = self._backend._session.user_name
             return translator.to_playlist(sp_playlist, username=username)
 
+    def _api_call(self, playlist, method, **kwargs):
+        user_id = playlist.uri.split(':')[-3]
+        playlist_id = playlist.uri.split(':')[-1]
+        url = 'users/{}/playlists/{}/tracks'.format(user_id, playlist_id)
+        method = getattr(self._backend._web_client, method.lower())
+        if not method:
+            raise RuntimeError('Invalid HTTP method')
+
+        response = method(url,
+                           headers = { 'Content-Type': 'application/json' },
+                           json = kwargs)
+
+        logger.debug('API response: {}'.format(response))
+
+        if response and 'error' not in response:
+            # Invalidate the cache for this playlist to force a new lookup
+            return self.lookup(playlist.uri, skip_cache=True)
+        else:
+            logging.error('Error on playlist item(s) removal: {}'.format(
+                response['error'] if response else '(Unknown error)'))
+
+            return playlist
+
     def delete(self, uri):
         # Playlist deletion is not implemented in the web API, see
         # https://github.com/spotify/web-api/issues/555
@@ -198,10 +221,6 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
         if not saved_playlist:
             return
 
-        user_id = playlist.uri.split(':')[-3]
-        playlist_id = playlist.uri.split(':')[-1]
-        url = 'users/{}/playlists/{}/tracks'.format(user_id, playlist_id)
-
         new_tracks = dict((track.uri, track) for track in playlist.tracks)
         old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
         removed_uris = [track.uri for track in saved_playlist.tracks
@@ -211,17 +230,12 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
         if removed_uris:
             logger.info('Removing {} tracks from playlist {}: {}'.format(
                 len(removed_uris), playlist.name, removed_uris))
-            response = self._backend._web_client.delete(
-                url, headers = { 'Content-Type': 'application/json' },
-                json = {'tracks': [{'uri': uri for uri in removed_uris}] })
 
-            if response and 'error' not in response:
-                # Invalidate the cache for this playlist to force a new lookup
-                saved_playlist = self.lookup(playlist.uri, skip_cache=True)
-                old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
-            else:
-                logging.error('Error on playlist item(s) removal: {}'.format(
-                    response['error'] if response else '(Unknown error)'))
+            saved_playlist = self._api_call(
+                playlist, method='delete',
+                tracks=[{'uri': uri for uri in removed_uris}])
+
+            old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
 
         # Add tracks logic
         position = None
@@ -236,18 +250,10 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
                         logger.info('Adding {} to playlist {}'.format(
                             added_uris, playlist.name))
 
-                        response = self._backend._web_client.post(
-                            url, headers = { 'Content-Type': 'application/json' },
-                            json = { 'uris': added_uris, 'position': position })
-
-                        if response and 'error' not in response:
-                            # Invalidate the cache for this playlist to force a new lookup
-                            saved_playlist = self.lookup(playlist.uri, skip_cache=True)
-                            old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
-
-                        if 'error' in response:
-                            logging.error('Error on playlist add: {}'.format(response['error']))
-
+                        saved_playlist = self._api_call(
+                            playlist, method='delete',
+                            uris=added_uris, position=position)
+                        old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
                         added_uris = []
 
                     position = i
@@ -256,17 +262,10 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
 
         if added_uris:
             logger.info('Adding {} to playlist {}'.format(added_uris, playlist.name))
-            response = self._backend._web_client.post(
-                url, headers = { 'Content-Type': 'application/json' },
-                json = { 'uris': added_uris, 'position': position })
+            saved_playlist = self._api_call(playlist, method='post',
+                uris=added_uris, position=position)
 
-            if response and 'error' not in response:
-                # Invalidate the cache for this playlist to force a new lookup
-                saved_playlist = self.lookup(playlist.uri, skip_cache=True)
-                old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
-
-            if 'error' in response:
-                logging.error('Error on playlist add: {}'.format(response['error']))
+            old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
 
         # Swap tracks logic
         old_tracks_by_uri = {}
@@ -281,18 +280,11 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
                     logger.info('Moving item position [{}] to [{}] in playlist {}'.
                                 format(old_pos, new_pos, playlist.name))
 
-                    response = self._backend._web_client.put(
-                        url, headers = { 'Content-Type': 'application/json' },
-                        json = {'range_start': old_pos, 'insert_before': new_pos })
+                    saved_playlist = self._api_call(
+                        playlist, method='put',
+                        range_start=old_pos, insert_before=new_pos)
 
-                    if response and 'error' not in response:
-                        # Invalidate the cache for this playlist to force a new lookup
-                        saved_playlist = self.lookup(playlist.uri, skip_cache=True)
-                        old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
-
-                    if 'error' in response:
-                        logging.error('Error on playlist reorder: {}'.format(response['error']))
-
+                    old_tracks = dict((track.uri, track) for track in saved_playlist.tracks)
 
         return saved_playlist
 
