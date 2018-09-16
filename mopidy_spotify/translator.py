@@ -292,6 +292,7 @@ def web_to_playlist(web_playlist, folders=None, username=None, bitrate=None,
         if isinstance(web_tracks, dict) and 'items' in web_tracks:
             web_tracks = [t['track'] for t in web_tracks['items']]
             web_playlist['tracks'] = web_tracks
+        web_tracks = filter(None, web_tracks)
     else:
         web_tracks = []
 
