@@ -73,8 +73,8 @@ class SpotifyPlaylistsProvider(backend.PlaylistsProvider):
     def _get_all_items(self, first_result, params=None):
         if params is None:
             params = {}
-        items = first_result['items']
-        uri = first_result['next']
+        items = first_result.get('items', [])
+        uri = first_result.get('next')
         while uri is not None:
             logger.debug("Getting next page")
             next_result = self._backend._web_client.get(uri, params=params)
