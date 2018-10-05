@@ -100,8 +100,25 @@ def _lookup_playlist(web_client, config, link):
     uri = '%s/users/%s/playlists/%s' % (_API_BASE_URI, link.owner, link.id)
     fields = ['name', 'owner', 'type', 'uri', 'tracks']
     result = web_client.get(uri, params={'fields': ','.join(fields)})
-    if result:
-        for item in result.get('tracks', {}).get('items', []):
-            track = item.get('track', None)
+    playlist = []
+
+    while result:
+        if 'tracks' in result:
+            next_uri = result['tracks'].get('next')
+            items = result['tracks'].get('items', [])
+        else:
+            next_uri = result.get('next')
+            items = result.get('items', [])
+
+        for item in items:
+            track = item.get('track')
             if track:
-                yield translator.web_to_track(track, bitrate=config['bitrate'])
+                playlist.append(translator.web_to_track(
+                    track, bitrate=config['bitrate']))
+
+        if next_uri:
+            result = web_client.get(next_uri)
+        else:
+            result = {}
+
+    return playlist
