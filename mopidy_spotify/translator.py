@@ -348,6 +348,8 @@ def parse_uri(uri):
     elif len(parts) == 3 and parts[0] == 'user' and parts[2] == 'starred':
         if parsed_uri.scheme == 'spotify':
             return _result(uri, 'starred',  None, parts[1])
+    elif len(parts) == 2 and parts[0] == 'playlist':
+        return _result(uri, 'playlist', parts[1], None)
     elif len(parts) == 3 and parts[0] == 'playlist':
         return _result(uri, 'playlist',  parts[2], parts[1])
     elif len(parts) == 4 and parts[0] == 'user' and parts[2] == 'playlist':
